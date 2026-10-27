@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point-in-Time Filter — Explanation and Results</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f3f5f8; color: #1e293b; font: 16px/1.65 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 36px auto; padding: 44px; background: white; border-radius: 14px; }
+  h1, h2, h3 { line-height: 1.25; color: #102b46; }
+  h1 { font-size: 34px; margin: 8px 0 18px; }
+  h2 { margin-top: 38px; font-size: 24px; }
+  .eyebrow { color: #176a72; font-weight: 700; letter-spacing: .08em; font-size: 12px; text-transform: uppercase; }
+  .callout { padding: 18px 22px; background: #eaf5f4; border-left: 4px solid #167d83; margin: 24px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 15px; }
+  th, td { padding: 11px 13px; border-bottom: 1px solid #dce3eb; text-align: left; }
+  th { background: #edf2f7; color: #102b46; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  code { font-family: Consolas, monospace; background: #edf2f7; padding: 2px 5px; border-radius: 4px; }
+  pre { overflow-x: auto; background: #132b42; color: #f1f5f9; padding: 20px; border-radius: 8px; line-height: 1.6; }
+  pre code { background: none; padding: 0; }
+  a { color: #086d85; }
+  li { margin: 9px 0; }
+  footer { margin-top: 36px; padding-top: 18px; border-top: 1px solid #dce3eb; color: #526176; font-size: 14px; }
+  @media(max-width: 650px) { main { margin: 0; padding: 24px 18px; border-radius: 0; } h1 { font-size: 28px; } }
+  @media print { body { background: white; font-size: 11pt; } main { margin: 0; padding: 0; max-width: none; } h2, h3 { break-after: avoid; } tr, .callout, pre { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Individual exercise · fictional bond funds</div>
+<h1>What was knowable on March 31, 2026?</h1>
+<p>The objective is to build a point-in-time filter and prove its results against the supplied known answer. The completed <a href="asof.py">asof.py</a> applies four rules in order, preserves source row numbers, and calculates returns from the surviving prices.</p>
+<div class="callout"><strong>Verified result:</strong> six rows remain: <strong>1, 4, 5, 6, 9, and 12</strong>. The row funnel and all six as-of and naive signals match the assignment’s known answers.</div>
+
+<h2>1. Two dates answer different questions</h2>
+<p><strong>Month measured</strong> identifies the period the price describes. <strong>Published on</strong> identifies when that price became available. A February observation published in April cannot be used for a March 31 decision. A revision is another publication for the same ticker and measured month.</p>
+<p>The cutoff is inclusive: a publication dated March 31 is allowed. A publication dated April 1 or later is excluded.</p>
+
+<h2>2. Apply the four rules in order</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Step</th><th>Reason</th><th>Rows removed</th><th>Count removed</th><th>Rows left</th></tr></thead>
+<tbody>
+<tr><td>Start</td><td>Original input table</td><td>—</td><td>—</td><td>12</td></tr>
+<tr><td>1. Quarantine</td><td>No ticker</td><td>11</td><td>1</td><td>11</td></tr>
+<tr><td>2. Remove duplicate</td><td>Row 7 repeats row 6’s data</td><td>7</td><td>1</td><td>10</td></tr>
+<tr><td>3. Apply cutoff</td><td>Published after March 31</td><td>3, 8, 10</td><td>3</td><td>7</td></tr>
+<tr><td>4. Keep latest revision</td><td>Row 4 replaces row 2</td><td>2</td><td>1</td><td>6</td></tr>
+</tbody></table></div>
+<p>Exact duplicates are compared using ticker, measured month, publication date, and price. The source row number is excluded from that comparison because it identifies the record, rather than its economic content.</p>
+
+<h2>3. The as-of panel</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Source row</th><th>Ticker</th><th>Month measured</th><th>Published on</th><th>Price</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>AAA</td><td>2026-01</td><td>2026-02-10</td><td>101.0</td></tr>
+<tr><td>4</td><td>AAA</td><td>2026-02</td><td>2026-03-25</td><td>103.0</td></tr>
+<tr><td>5</td><td>BBB</td><td>2026-01</td><td>2026-02-10</td><td>98.0</td></tr>
+<tr><td>6</td><td>BBB</td><td>2026-02</td><td>2026-03-10</td><td>97.0</td></tr>
+<tr><td>9</td><td>CCC</td><td>2026-01</td><td>2026-02-10</td><td>110.0</td></tr>
+<tr><td>12</td><td>CCC</td><td>2026-02</td><td>2026-03-10</td><td>111.0</td></tr>
+</tbody></table></div>
+
+<h2>4. Calculate and compare the signals</h2>
+<p>The signal is the price return from the previous calendar month to the latest month available in the panel:</p>
+<pre><code>Return (%) = (latest price / previous month's price - 1) × 100</code></pre>
+<p>The naive comparison still removes missing tickers and exact duplicates, but ignores the decision-date cutoff and selects the latest publication for each ticker and month.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Ticker</th><th>As-of calculation</th><th>As-of signal</th><th>Naive calculation</th><th>Naive signal</th></tr></thead>
+<tbody>
+<tr><td>AAA</td><td>(103 / 101 − 1) × 100</td><td>+1.98% · February</td><td>(109 / 103 − 1) × 100</td><td>+5.83% · March</td></tr>
+<tr><td>BBB</td><td>(97 / 98 − 1) × 100</td><td>−1.02% · February</td><td>(92 / 97 − 1) × 100</td><td>−5.15% · March</td></tr>
+<tr><td>CCC</td><td>(111 / 110 − 1) × 100</td><td>+0.91% · February</td><td>(112 / 110 − 1) × 100</td><td>+1.82% · February, revised</td></tr>
+</tbody></table></div>
+<p>All months shown are in 2026. These are price returns, not the yields of the underlying zero-coupon bonds.</p>
+
+<h2>5. How rule 4 works in the code</h2>
+<pre><code>latest = {}
+for row in rows:
+    key = (row[1], row[2])
+    if key not in latest or row[3] &gt; latest[key][3]:
+        latest[key] = row</code></pre>
+<ul>
+<li><code>latest = {}</code> creates a dictionary to hold one selected record per ticker and month.</li>
+<li><code>for row in rows:</code> examines each eligible record.</li>
+<li><code>key = (row[1], row[2])</code> groups by ticker and measured month, such as <code>("AAA", "2026-02")</code>.</li>
+<li>The <code>if</code> condition accepts the first record for a group or replaces it when a later publication appears. ISO dates in <code>YYYY-MM-DD</code> format sort chronologically.</li>
+<li><code>latest[key] = row</code> stores the selected record, including its original row number.</li>
+</ul>
+<p>The full function also rejects conflicting prices published on the same date for the same group and returns the chosen rows in source-row order.</p>
+<p>For the as-of panel, this function receives only records that already passed the publication cutoff. AAA’s February price of 104 in row 2 is replaced by 103 in row 4, published March 25. CCC’s April 5 revision is excluded before this step, so row 12 remains available.</p>
+
+<h2>6. Sanity check: availability does not prove plausibility</h2>
+<p>Each fictional fund represents one-year zero-coupon bonds that pay 100 at maturity and nothing before. Calculate the implied yield as:</p>
+<pre><code>Yield (%) = (100 / price - 1) × 100</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Row</th><th>Fund / month</th><th>Price</th><th>Yield</th><th>Issue under the exercise’s assumptions</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>AAA / January</td><td>101.0</td><td>−0.99%</td><td>Negative yield</td></tr>
+<tr><td>4</td><td>AAA / February</td><td>103.0</td><td>−2.91%</td><td>Negative yield</td></tr>
+<tr><td>5</td><td>BBB / January</td><td>98.0</td><td>+2.04%</td><td>None</td></tr>
+<tr><td>6</td><td>BBB / February</td><td>97.0</td><td>+3.09%</td><td>None</td></tr>
+<tr><td>9</td><td>CCC / January</td><td>110.0</td><td>−9.09%</td><td>Negative yield; priced above both AAA and BBB</td></tr>
+<tr><td>12</td><td>CCC / February</td><td>111.0</td><td>−9.91%</td><td>Negative yield; priced above both AAA and BBB</td></tr>
+</tbody></table></div>
+<p>The exercise expects riskier credit at the same maturity to yield more and therefore cost less: AAA above BBB above CCC in price. CCC violates that ordering in both months. Prices above 100 imply negative yields, which the exercise flags as planted errors.</p>
+<p>The four filtering rules check provenance and timing. They do not remove these economic anomalies. The sanity check is a separate review of the six surviving rows.</p>
+
+<h2>7. What look-ahead bias means here</h2>
+<p><strong>Look-ahead bias is using information that was unavailable at the time of a decision.</strong> It can enter through a new observation published later or through a later revision of an earlier observation.</p>
+<p>AAA’s naive return of +5.83% uses March’s price of 109, published on April 10. On March 31, that price was not yet knowable. The latest available month was February, whose revised price was 103. The available return was therefore +1.98%.</p>
+<p>CCC shows the revision version of the same problem: February’s price of 112 was published April 5. Its measured month is before the cutoff, but its publication is after it. Using 112 instead of the available 111 changes the return from +0.91% to +1.82%.</p>
+<p>Future information does not always improve the apparent return: BBB’s naive return is more negative. The issue is whether the information was available, regardless of whether it makes performance look better or worse.</p>
+<p>If the decision date is changed to April 10, 2026, all supplied publications become eligible, and the as-of signals match the naive signals for this dataset.</p>
+
+<h2>8. Run the completed program</h2>
+<p>Keep this explanation alongside <a href="asof.py">asof.py</a>. In the project folder, run:</p>
+<pre><code>python asof.py</code></pre>
+<p>Edit <code>DECISION_DATE</code> and <code>TABLE</code> at the top of the Python file to try other inputs. The program computes its funnel, panel, and signals from those inputs; its answers are not hard-coded.</p>
+<footer>This HTML is a static explanation of the supplied dataset and the verified March 31 run. If the Python inputs change, rerun the program for updated results. Partner activities are omitted.</footer>
+</main>
+</body>
+</html>
